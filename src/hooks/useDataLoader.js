@@ -24,12 +24,7 @@ const useDataLoader = () => {
     loadData();
   }, []);
 
-  const getUniqueHierLevels = () => {
-    if (!mountainAreasData) return [];
-    return [...new Set(mountainAreasData.features.map(feature => feature.properties?.Hier_lvl))].sort((a, b) => a - b);
-  };
-
-  return { mountainAreasData, allOsmPeaks, dataLoaded, getUniqueHierLevels };
+  return { mountainAreasData, allOsmPeaks, dataLoaded };
 };
 
 export default useDataLoader;

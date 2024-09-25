@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { MapContainer, TileLayer, GeoJSON, Marker, useMap } from 'react-leaflet';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+import L from 'leaflet';
 import useDataLoader from '../hooks/useDataLoader';
 import useLayerManager from '../hooks/useLayerManager';
 import Controls from './Controls';
 import 'leaflet/dist/leaflet.css';
+import 'react-leaflet-cluster/lib/assets/MarkerCluster.css';
+import 'react-leaflet-cluster/lib/assets/MarkerCluster.Default.css';
 
 const MapContent = ({ mountainAreasData, allOsmPeaks, dataLoaded }) => {
   const map = useMap();
@@ -35,26 +39,38 @@ const MapContent = ({ mountainAreasData, allOsmPeaks, dataLoaded }) => {
     setFilteredPeaks(filterAndDisplayPeaks(newLevel));
   }, [filterMountainAreas, filterAndDisplayPeaks]);
 
+  const memoizedGeoJSON = useMemo(() => {
+    if (!filteredMountainAreas) return null;
+    return (
+      <GeoJSON
+        data={filteredMountainAreas}
+        style={defaultPolygonStyle}
+        onEachFeature={onEachFeature}
+      />
+    );
+  }, [filteredMountainAreas, defaultPolygonStyle, onEachFeature]);
+
+  const memoizedMarkers = useMemo(() => {
+    if (!filteredPeaks) return null;
+    return filteredPeaks.map((peak, index) => (
+      <L.Marker
+        key={index}
+        position={[peak.geometry.coordinates[1], peak.geometry.coordinates[0]]}
+        icon={createMarker(peak, [peak.geometry.coordinates[1], peak.geometry.coordinates[0]]).options.icon}
+      />
+    ));
+  }, [filteredPeaks, createMarker]);
+
   return (
     <>
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       />
-      {dataLoaded && filteredMountainAreas && (
-        <GeoJSON
-          data={filteredMountainAreas}
-          style={defaultPolygonStyle}
-          onEachFeature={onEachFeature}
-        />
-      )}
-      {dataLoaded && filteredPeaks && filteredPeaks.map((peak, index) => (
-        <Marker
-          key={index}
-          position={[peak.geometry.coordinates[1], peak.geometry.coordinates[0]]}
-          icon={createMarker(peak, [peak.geometry.coordinates[1], peak.geometry.coordinates[0]]).options.icon}
-        />
-      ))}
+      {memoizedGeoJSON}
+      <MarkerClusterGroup chunkedLoading>
+        {memoizedMarkers}
+      </MarkerClusterGroup>
       <Controls
         hierLevels={hierLevels}
         currentHierLevel={currentHierLevel}

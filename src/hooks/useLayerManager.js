@@ -1,16 +1,16 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import L from 'leaflet';
 
 const useLayerManager = (mountainAreasData, allOsmPeaks) => {
-  const [currentHierLevel, setCurrentHierLevel] = useState(null);
+  const [currentHierLevel, setCurrentHierLevel] = useState("4");
 
-  const defaultPolygonStyle = {
+  const defaultPolygonStyle = useMemo(() => ({
     color: "#ff7800",
     weight: 2,
     opacity: 1,
     fillColor: "#ffcc66",
     fillOpacity: 0.65
-  };
+  }), []);
 
   const onEachFeature = useCallback((feature, layer) => {
     const popupContent = `
@@ -23,9 +23,9 @@ const useLayerManager = (mountainAreasData, allOsmPeaks) => {
 
   const filterMountainAreas = useCallback((selectedValue) => {
     setCurrentHierLevel(selectedValue);
-    return mountainAreasData.features.filter(feature => 
+    return mountainAreasData?.features.filter(feature => 
       String(feature.properties.Hier_lvl).trim() === selectedValue
-    );
+    ) || [];
   }, [mountainAreasData]);
 
   const createMarker = useCallback((feature, latlng) => {
@@ -46,6 +46,8 @@ const useLayerManager = (mountainAreasData, allOsmPeaks) => {
   }, []);
 
   const filterAndDisplayPeaks = useCallback((hierLvl, mapName = null) => {
+    if (!allOsmPeaks) return [];
+    
     let filteredPeaks;
 
     if (mapName) {
