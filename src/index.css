@@ -9,3 +9,24 @@ body, html {
   height: 100%;
   width: 100%;
 }
+
+.leaflet-control {
+  background-color: white;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+}
+
+.control-section {
+  margin-bottom: 15px;
+}
+
+.control-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.custom-slider {
+  width: 100%;
+}
