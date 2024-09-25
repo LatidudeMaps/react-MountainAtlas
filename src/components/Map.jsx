@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import 'react-leaflet-cluster/lib/assets/MarkerCluster.css';
 import 'react-leaflet-cluster/lib/assets/MarkerCluster.Default.css';
 
-const HierarchyControl = ({ hierarchyLevels, currentLevel, onChange }) => {
+const HierarchyControl = React.memo(({ hierarchyLevels, currentLevel, onChange }) => {
   const map = useMap();
 
   return (
@@ -20,7 +20,7 @@ const HierarchyControl = ({ hierarchyLevels, currentLevel, onChange }) => {
       </div>
     </div>
   );
-};
+});
 
 const Map = () => {
   const [mountainAreas, setMountainAreas] = useState(null);
@@ -49,7 +49,7 @@ const Map = () => {
   const filteredAreas = useMemo(() => {
     if (!mountainAreas) return null;
     return {
-      ...mountainAreas,
+      type: "FeatureCollection",
       features: mountainAreas.features.filter(feature => 
         String(feature.properties.Hier_lvl) === currentHierLevel
       )
@@ -58,12 +58,9 @@ const Map = () => {
 
   const filteredPeaks = useMemo(() => {
     if (!osmPeaks) return null;
-    return {
-      ...osmPeaks,
-      features: osmPeaks.features.filter(feature => 
-        String(feature.properties.Hier_lvl) === currentHierLevel
-      )
-    };
+    return osmPeaks.features.filter(feature => 
+      String(feature.properties.Hier_lvl) === currentHierLevel
+    );
   }, [osmPeaks, currentHierLevel]);
 
   const hierarchyLevels = useMemo(() => {
@@ -71,13 +68,25 @@ const Map = () => {
     return [...new Set(mountainAreas.features.map(f => f.properties.Hier_lvl))].sort();
   }, [mountainAreas]);
 
-  const createClusterCustomIcon = function (cluster) {
+  const createClusterCustomIcon = useCallback((cluster) => {
     return L.divIcon({
       html: `<span>${cluster.getChildCount()}</span>`,
       className: 'custom-marker-cluster',
       iconSize: L.point(40, 40, true),
     });
-  };
+  }, []);
+
+  const areaStyle = useCallback(() => ({
+    color: "#ff7800",
+    weight: 2,
+    opacity: 1,
+    fillColor: "#ffcc66",
+    fillOpacity: 0.65
+  }), []);
+
+  const onEachFeature = useCallback((feature, layer) => {
+    layer.bindPopup(`<strong>${feature.properties.MapName}</strong>`);
+  }, []);
 
   return (
     <MapContainer center={[45.5, 10.5]} zoom={6} style={{ height: '100vh', width: '100%' }}>
@@ -89,13 +98,8 @@ const Map = () => {
         <GeoJSON 
           key={currentHierLevel}
           data={filteredAreas} 
-          style={() => ({
-            color: "#ff7800",
-            weight: 2,
-            opacity: 1,
-            fillColor: "#ffcc66",
-            fillOpacity: 0.65
-          })}
+          style={areaStyle}
+          onEachFeature={onEachFeature}
         />
       )}
       {filteredPeaks && (
@@ -103,7 +107,7 @@ const Map = () => {
           chunkedLoading
           iconCreateFunction={createClusterCustomIcon}
         >
-          {filteredPeaks.features.map((peak, index) => (
+          {filteredPeaks.map((peak, index) => (
             <Marker 
               key={index} 
               position={[peak.geometry.coordinates[1], peak.geometry.coordinates[0]]}
