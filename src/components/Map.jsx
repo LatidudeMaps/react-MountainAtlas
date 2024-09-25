@@ -7,8 +7,6 @@ import 'react-leaflet-cluster/lib/assets/MarkerCluster.css';
 import 'react-leaflet-cluster/lib/assets/MarkerCluster.Default.css';
 
 const HierarchyControl = React.memo(({ hierarchyLevels, currentLevel, onChange }) => {
-  const map = useMap();
-
   return (
     <div className="leaflet-top leaflet-right">
       <div className="leaflet-control leaflet-bar">
@@ -22,10 +20,17 @@ const HierarchyControl = React.memo(({ hierarchyLevels, currentLevel, onChange }
   );
 });
 
+const LoadingOverlay = () => (
+  <div className="loading-overlay">
+    <div className="loading-spinner"></div>
+  </div>
+);
+
 const Map = () => {
   const [mountainAreas, setMountainAreas] = useState(null);
   const [osmPeaks, setOsmPeaks] = useState(null);
   const [currentHierLevel, setCurrentHierLevel] = useState("4");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -36,10 +41,23 @@ const Map = () => {
         ]);
         const mountainAreasData = await mountainAreasResponse.json();
         const osmPeaksData = await osmPeaksResponse.json();
+        
+        // Pre-process the data
+        const processedOsmPeaks = osmPeaksData.features.reduce((acc, peak) => {
+          const hierLevel = String(peak.properties.Hier_lvl);
+          if (!acc[hierLevel]) {
+            acc[hierLevel] = [];
+          }
+          acc[hierLevel].push(peak);
+          return acc;
+        }, {});
+
         setMountainAreas(mountainAreasData);
-        setOsmPeaks(osmPeaksData);
+        setOsmPeaks(processedOsmPeaks);
+        setIsLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
+        setIsLoading(false);
       }
     };
 
@@ -58,9 +76,7 @@ const Map = () => {
 
   const filteredPeaks = useMemo(() => {
     if (!osmPeaks) return null;
-    return osmPeaks.features.filter(feature => 
-      String(feature.properties.Hier_lvl) === currentHierLevel
-    );
+    return osmPeaks[currentHierLevel] || [];
   }, [osmPeaks, currentHierLevel]);
 
   const hierarchyLevels = useMemo(() => {
@@ -88,45 +104,56 @@ const Map = () => {
     layer.bindPopup(`<strong>${feature.properties.MapName}</strong>`);
   }, []);
 
+  const handleHierLevelChange = useCallback((newLevel) => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setCurrentHierLevel(newLevel);
+      setIsLoading(false);
+    }, 0);
+  }, []);
+
   return (
-    <MapContainer center={[45.5, 10.5]} zoom={6} style={{ height: '100vh', width: '100%' }}>
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-      />
-      {filteredAreas && (
-        <GeoJSON 
-          key={currentHierLevel}
-          data={filteredAreas} 
-          style={areaStyle}
-          onEachFeature={onEachFeature}
+    <>
+      <MapContainer center={[45.5, 10.5]} zoom={6} style={{ height: '100vh', width: '100%' }}>
+        <TileLayer
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
-      )}
-      {filteredPeaks && (
-        <MarkerClusterGroup 
-          chunkedLoading
-          iconCreateFunction={createClusterCustomIcon}
-        >
-          {filteredPeaks.map((peak, index) => (
-            <Marker 
-              key={index} 
-              position={[peak.geometry.coordinates[1], peak.geometry.coordinates[0]]}
-            >
-              <Popup>
-                <strong>{peak.properties.name || "Unnamed Peak"}</strong><br />
-                Elevation: {peak.properties.elevation || "Unknown"} m<br />
-                MapName: {peak.properties.MapName}
-              </Popup>
-            </Marker>
-          ))}
-        </MarkerClusterGroup>
-      )}
-      <HierarchyControl 
-        hierarchyLevels={hierarchyLevels}
-        currentLevel={currentHierLevel}
-        onChange={setCurrentHierLevel}
-      />
-    </MapContainer>
+        {filteredAreas && (
+          <GeoJSON 
+            key={currentHierLevel}
+            data={filteredAreas} 
+            style={areaStyle}
+            onEachFeature={onEachFeature}
+          />
+        )}
+        {filteredPeaks && (
+          <MarkerClusterGroup 
+            chunkedLoading
+            iconCreateFunction={createClusterCustomIcon}
+          >
+            {filteredPeaks.map((peak, index) => (
+              <Marker 
+                key={index} 
+                position={[peak.geometry.coordinates[1], peak.geometry.coordinates[0]]}
+              >
+                <Popup>
+                  <strong>{peak.properties.name || "Unnamed Peak"}</strong><br />
+                  Elevation: {peak.properties.elevation || "Unknown"} m<br />
+                  MapName: {peak.properties.MapName}
+                </Popup>
+              </Marker>
+            ))}
+          </MarkerClusterGroup>
+        )}
+        <HierarchyControl 
+          hierarchyLevels={hierarchyLevels}
+          currentLevel={currentHierLevel}
+          onChange={handleHierLevelChange}
+        />
+      </MapContainer>
+      {isLoading && <LoadingOverlay />}
+    </>
   );
 };
 
