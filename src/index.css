@@ -17,3 +17,18 @@ body, html {
   border-radius: 4px;
   background-color: white;
 }
+
+.custom-marker-cluster {
+  background-clip: padding-box;
+  border-radius: 20px;
+  background-color: rgba(255, 120, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+}
+
+.custom-marker-cluster span {
+  font-size: 14px;
+}
