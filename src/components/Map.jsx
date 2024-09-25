@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
+import * as turf from '@turf/turf';
 import 'leaflet/dist/leaflet.css';
 import 'react-leaflet-cluster/lib/assets/MarkerCluster.css';
 import 'react-leaflet-cluster/lib/assets/MarkerCluster.Default.css';
@@ -26,11 +27,33 @@ const LoadingOverlay = () => (
   </div>
 );
 
+const CustomGeoJSONLayer = ({ data, style, onEachFeature }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (!data) return;
+
+    const layer = L.geoJSON(data, {
+      style,
+      onEachFeature
+    });
+
+    layer.addTo(map);
+
+    return () => {
+      map.removeLayer(layer);
+    };
+  }, [map, data, style, onEachFeature]);
+
+  return null;
+};
+
 const Map = () => {
   const [mountainAreas, setMountainAreas] = useState(null);
   const [osmPeaks, setOsmPeaks] = useState(null);
   const [currentHierLevel, setCurrentHierLevel] = useState("4");
   const [isLoading, setIsLoading] = useState(true);
+  const [simplifiedAreas, setSimplifiedAreas] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -54,6 +77,14 @@ const Map = () => {
 
         setMountainAreas(mountainAreasData);
         setOsmPeaks(processedOsmPeaks);
+
+        // Simplify the mountain areas for different zoom levels
+        const simplified = {};
+        [0.01, 0.005, 0.001].forEach(tolerance => {
+          simplified[tolerance] = turf.simplify(mountainAreasData, { tolerance, highQuality: false });
+        });
+        setSimplifiedAreas(simplified);
+
         setIsLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -119,10 +150,9 @@ const Map = () => {
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
-        {filteredAreas && (
-          <GeoJSON 
-            key={currentHierLevel}
-            data={filteredAreas} 
+        {simplifiedAreas && (
+          <CustomGeoJSONLayer 
+            data={simplifiedAreas[0.01]}
             style={areaStyle}
             onEachFeature={onEachFeature}
           />
